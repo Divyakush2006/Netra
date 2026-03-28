@@ -1,0 +1,30 @@
+# Project Netra Backend
+fastapi==0.109.0
+uvicorn[standard]==0.27.0
+pydantic==2.5.3
+python-multipart==0.0.6
+
+# AI / Detection
+ultralytics==8.1.0
+numpy>=1.24.0
+opencv-python-headless==4.9.0.80
+Pillow>=10.0.0
+
+# Tracking
+scipy>=1.11.0
+filterpy>=1.4.5
+lap>=0.4.0
+
+# MQTT
+paho-mqtt==1.6.1
+
+# Database
+sqlalchemy==2.0.25
+aiosqlite==0.19.0
+
+# WebSocket
+websockets==12.0
+
+# Utilities
+python-dotenv==1.0.0
+httpx==0.26.0

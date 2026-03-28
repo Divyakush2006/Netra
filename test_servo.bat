@@ -1,0 +1,13 @@
+@echo off
+echo Sending RIGHT command...
+"C:\Program Files\mosquitto\mosquitto_pub.exe" -h localhost -t netra/cam01/servo/cmd -m "{\"direction\":\"right\",\"value\":5}"
+timeout /t 2 >nul
+echo Sending RIGHT again...
+"C:\Program Files\mosquitto\mosquitto_pub.exe" -h localhost -t netra/cam01/servo/cmd -m "{\"direction\":\"right\",\"value\":5}"
+timeout /t 2 >nul
+echo Sending LEFT command...
+"C:\Program Files\mosquitto\mosquitto_pub.exe" -h localhost -t netra/cam01/servo/cmd -m "{\"direction\":\"left\",\"value\":5}"
+timeout /t 2 >nul
+echo Sending CENTER command...
+"C:\Program Files\mosquitto\mosquitto_pub.exe" -h localhost -t netra/cam01/servo/cmd -m "{\"direction\":\"center\",\"value\":0}"
+echo Done!
