@@ -591,7 +591,7 @@ This project is licensed under the **MIT License** — see the [LICENSE](LICENSE
 
 ## 👤 Author
 
-**Divya Kush** — [@divyakush2006](https://github.com/divyakush2006)
+**Divyakush** — [@divyakush2006](https://github.com/divyakush2006)
 
 ---
 
