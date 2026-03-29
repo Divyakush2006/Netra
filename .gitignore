@@ -1,0 +1,37 @@
+# Python
+__pycache__/
+*.py[cod]
+*.so
+*.egg-info/
+dist/
+build/
+venv/
+.env
+
+# YOLO model weights (large file — download separately)
+backend/yolov8n.pt
+
+# Database
+*.db
+
+# Node.js
+node_modules/
+dashboard/dist/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# PlatformIO
+firmware/.pio/
+firmware/.vscode/
+
+# Logs
+*.log

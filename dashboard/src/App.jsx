@@ -47,10 +47,86 @@ function useWebSocket(url) {
 }
 
 // ============================================
-// Live Feed Component
+// Live Feed Component — Stream isolated from React renders
 // ============================================
 function LiveFeed({ cameraIp, detections }) {
-    const streamUrl = cameraIp ? `http://10.154.46.161:81/:81/stream` : null;
+    const containerRef = useRef(null);
+    const imgRef = useRef(null);
+    const currentUrlRef = useRef(null);
+
+    // Imperatively create/manage the <img> element so React NEVER touches it
+    useEffect(() => {
+        const container = containerRef.current;
+        if (!container) return;
+
+        const newUrl = cameraIp ? `http://${cameraIp}:81/stream` : null;
+        if (currentUrlRef.current === newUrl && imgRef.current) return;
+        currentUrlRef.current = newUrl;
+
+        // Clean up old img
+        if (imgRef.current) {
+            imgRef.current.src = '';
+            imgRef.current.remove();
+            imgRef.current = null;
+        }
+
+        if (!newUrl) return;
+
+        // Create img element OUTSIDE of React
+        const img = document.createElement('img');
+        img.alt = 'Live Feed';
+        img.src = newUrl;
+
+        // Stall detection — if stream freezes, auto-reconnect
+        let stallTimer = null;
+        const STALL_TIMEOUT = 4000; // 4 seconds without a new frame = stalled
+
+        const resetStallTimer = () => {
+            clearTimeout(stallTimer);
+            stallTimer = setTimeout(() => {
+                // Stream stalled — force reconnect
+                if (img.parentNode) {
+                    img.src = '';
+                    setTimeout(() => {
+                        img.src = `${newUrl}?t=${Date.now()}`;
+                    }, 500);
+                }
+            }, STALL_TIMEOUT);
+        };
+
+        // MJPEG streams fire 'load' on each new frame in some browsers
+        // Also use a MutationObserver-like approach via polling naturalWidth
+        let lastWidth = 0;
+        const frameChecker = setInterval(() => {
+            if (img.naturalWidth !== lastWidth || img.complete) {
+                lastWidth = img.naturalWidth;
+                resetStallTimer();
+            }
+        }, 1000);
+
+        img.onload = resetStallTimer;
+        img.onerror = () => {
+            setTimeout(() => {
+                if (img.parentNode) {
+                    img.src = `${newUrl}?t=${Date.now()}`;
+                }
+            }, 2000);
+        };
+
+        resetStallTimer(); // Start initial timer
+
+        container.insertBefore(img, container.firstChild);
+        imgRef.current = img;
+
+        return () => {
+            clearTimeout(stallTimer);
+            clearInterval(frameChecker);
+            img.src = '';
+            img.remove();
+            imgRef.current = null;
+            currentUrlRef.current = null;
+        };
+    }, [cameraIp]);
 
     return (
         <div className="card">
@@ -61,10 +137,8 @@ function LiveFeed({ cameraIp, detections }) {
                 </span>
                 <span className="card-badge">CAM-01</span>
             </div>
-            <div className="live-feed-container">
-                {streamUrl ? (
-                    <img src={streamUrl} alt="Live Feed" />
-                ) : (
+            <div className="live-feed-container" ref={containerRef}>
+                {!cameraIp && (
                     <div className="live-feed-placeholder">
                         <span className="icon">📷</span>
                         <span>Camera not connected</span>
@@ -95,11 +169,26 @@ function LiveFeed({ cameraIp, detections }) {
 // ============================================
 // Camera Controls Component
 // ============================================
-function CameraControls({ onServoCmd, mode, setMode }) {
+function CameraControls({ onServoCmd, mode, setMode, trackingStatus }) {
     const [speed, setSpeed] = useState(80);
 
     const handleMove = (direction) => {
         onServoCmd({ type: 'servo_cmd', camera_id: 1, direction, value: Math.round(speed / 10) });
+    };
+
+    const handleModeChange = async (newMode) => {
+        if (newMode === 'auto') {
+            // Start YOLO auto-tracking
+            try {
+                await fetch(`${API_BASE}/camera/tracking/start`, { method: 'POST' });
+            } catch (e) { /* ignore */ }
+        } else if (mode === 'auto' && newMode !== 'auto') {
+            // Stop auto-tracking when leaving auto mode
+            try {
+                await fetch(`${API_BASE}/camera/tracking/stop`, { method: 'POST' });
+            } catch (e) { /* ignore */ }
+        }
+        setMode(newMode);
     };
 
     return (
@@ -109,6 +198,9 @@ function CameraControls({ onServoCmd, mode, setMode }) {
                     <span className="card-title-icon">🕹️</span>
                     Camera Controls
                 </span>
+                {mode === 'auto' && trackingStatus?.target_locked && (
+                    <span className="card-badge" style={{ background: '#22c55e', color: '#000' }}>🎯 LOCKED</span>
+                )}
             </div>
             <div className="card-body controls-grid">
                 {/* Mode Toggle */}
@@ -117,7 +209,7 @@ function CameraControls({ onServoCmd, mode, setMode }) {
                         <button
                             key={m}
                             className={`mode-btn ${mode === m.toLowerCase() ? 'active' : ''}`}
-                            onClick={() => setMode(m.toLowerCase())}
+                            onClick={() => handleModeChange(m.toLowerCase())}
                         >
                             {m}
                         </button>
@@ -430,34 +522,6 @@ function DigitalTwinMap({ trackedObjects, cameras }) {
 // System Status Component
 // ============================================
 function SystemStatus({ wsConnected, mqttConnected, stats }) {
-    const [grabberRunning, setGrabberRunning] = useState(false);
-    const [grabberFps, setGrabberFps] = useState(0);
-
-    // Poll grabber status
-    useEffect(() => {
-        const poll = async () => {
-            try {
-                const res = await fetch(`${API_BASE}/grabber/status`);
-                if (res.ok) {
-                    const data = await res.json();
-                    setGrabberRunning(data.running);
-                    setGrabberFps(data.fps || 0);
-                }
-            } catch (e) { /* Backend not running */ }
-        };
-        poll();
-        const interval = setInterval(poll, 3000);
-        return () => clearInterval(interval);
-    }, []);
-
-    const toggleGrabber = async () => {
-        try {
-            const endpoint = grabberRunning ? 'stop' : 'start';
-            await fetch(`${API_BASE}/grabber/${endpoint}`, { method: 'POST' });
-            setGrabberRunning(!grabberRunning);
-        } catch (e) { /* Backend not running */ }
-    };
-
     return (
         <div className="card">
             <div className="card-header">
@@ -469,10 +533,8 @@ function SystemStatus({ wsConnected, mqttConnected, stats }) {
             <div className="card-body">
                 <div className="sys-stats">
                     <div className="sys-stat">
-                        <div className="sys-stat-value" style={{ color: grabberFps > 0 ? 'var(--accent-emerald)' : undefined }}>
-                            {grabberFps > 0 ? grabberFps.toFixed(1) : '—'}
-                        </div>
-                        <div className="sys-stat-label">YOLO FPS</div>
+                        <div className="sys-stat-value">{stats.activeCameras || 0}</div>
+                        <div className="sys-stat-label">Cameras Online</div>
                     </div>
                     <div className="sys-stat">
                         <div className="sys-stat-value">{stats.totalDetections || 0}</div>
@@ -490,10 +552,6 @@ function SystemStatus({ wsConnected, mqttConnected, stats }) {
 
                 <div style={{ marginTop: '14px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
                     <div className="header-status">
-                        <span className={`status-dot ${grabberRunning ? 'online' : 'offline'}`} />
-                        YOLO Pipeline {grabberRunning ? `Running (${grabberFps.toFixed(1)} FPS)` : 'Stopped'}
-                    </div>
-                    <div className="header-status">
                         <span className={`status-dot ${wsConnected ? 'online' : 'offline'}`} />
                         WebSocket {wsConnected ? 'Connected' : 'Disconnected'}
                     </div>
@@ -502,14 +560,6 @@ function SystemStatus({ wsConnected, mqttConnected, stats }) {
                         MQTT Broker {mqttConnected ? 'Connected' : 'Disconnected'}
                     </div>
                 </div>
-
-                <button
-                    className={`btn btn-sm ${grabberRunning ? 'btn-danger' : 'btn-primary'}`}
-                    style={{ marginTop: '12px', width: '100%' }}
-                    onClick={toggleGrabber}
-                >
-                    {grabberRunning ? '⏹ Stop YOLO Pipeline' : '▶ Start YOLO Pipeline'}
-                </button>
             </div>
         </div>
     );
@@ -539,6 +589,8 @@ export default function App() {
         avgInference: '—',
     });
     const [settingsOpen, setSettingsOpen] = useState(false);
+    const [mqttConnected, setMqttConnected] = useState(false);
+    const [trackingStatus, setTrackingStatus] = useState({ running: false, target_locked: false });
 
     // Process WebSocket messages
     useEffect(() => {
@@ -558,6 +610,13 @@ export default function App() {
                 ...prev,
                 totalDetections: prev.totalDetections + (d.detections?.length || 0),
             }));
+        }
+
+        // YOLO auto-tracking updates
+        if (lastMessage.type === 'tracking') {
+            const t = lastMessage.data;
+            setTrackingStatus({ running: true, target_locked: t.locked, offset_x: t.offset_x, offset_y: t.offset_y });
+            setDetections(t.detections || []);
         }
     }, [lastMessage]);
 
@@ -580,6 +639,14 @@ export default function App() {
                         ...prev,
                         avgInference: data.yolo?.avg_inference_ms || '—',
                     }));
+                }
+            } catch (e) { /* Backend not running */ }
+
+            try {
+                const res = await fetch('/health');
+                if (res.ok) {
+                    const data = await res.json();
+                    setMqttConnected(data.mqtt_connected || false);
                 }
             } catch (e) { /* Backend not running */ }
         };
@@ -667,23 +734,20 @@ export default function App() {
         }
     }, []);
 
-    // Abort controller to cancel previous in-flight servo request
-    const servoAbortRef = useRef(null);
-
     const handleServoCmd = (cmd) => {
         if (cmd.type === 'servo_cmd') {
-            // Cancel any previous in-flight request — prevents queuing
-            if (servoAbortRef.current) servoAbortRef.current.abort();
-            const controller = new AbortController();
-            servoAbortRef.current = controller;
-
             if (servoIp) {
+                // Direct HTTP to servo ESP32 — instant, no conflict
+                // (servo is a DIFFERENT device from camera, its port 81 isn't blocked)
                 fetch(`http://${servoIp}:81/servo?dir=${cmd.direction}&val=${cmd.value}`, {
-                    signal: controller.signal,
+                    mode: 'no-cors',
                 }).catch(() => { });
             } else {
-                fetch(`${API_BASE}/camera/${cmd.camera_id}/servo-direct?dir=${cmd.direction}&val=${cmd.value}`, {
-                    signal: controller.signal,
+                // Fallback: route through backend → MQTT
+                fetch(`${API_BASE}/camera/${cmd.camera_id}/servo`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ direction: cmd.direction, value: cmd.value }),
                 }).catch(() => { });
             }
         } else {
@@ -746,7 +810,7 @@ export default function App() {
                         type="text"
                         value={cameraIp}
                         onChange={(e) => setCameraIp(e.target.value)}
-                        placeholder="10.215.167.161"
+                        placeholder="10.154.46.161"
                         style={{
                             padding: '6px 12px',
                             background: 'var(--bg-input)',
@@ -765,7 +829,7 @@ export default function App() {
                         type="text"
                         value={servoIp}
                         onChange={(e) => setServoIp(e.target.value)}
-                        placeholder="10.215.167.39"
+                        placeholder="10.154.46.39"
                         style={{
                             padding: '6px 12px',
                             background: 'var(--bg-input)',
@@ -793,11 +857,11 @@ export default function App() {
 
                 {/* Right Column: Controls & Alerts */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--gap-lg)' }}>
-                    <CameraControls onServoCmd={handleServoCmd} mode={mode} setMode={setMode} />
+                    <CameraControls onServoCmd={handleServoCmd} mode={mode} setMode={setMode} trackingStatus={trackingStatus} />
                     <AlertCenter alerts={alerts} />
                     <SystemStatus
                         wsConnected={isConnected}
-                        mqttConnected={false}
+                        mqttConnected={mqttConnected}
                         stats={stats}
                     />
                 </div>

@@ -13,11 +13,11 @@ from fastapi.staticfiles import StaticFiles
 
 from app.routers import camera, detection, patrol, alerts
 from app.services.mqtt_bridge import MQTTBridge
+from app.services.auto_tracker import AutoTracker
 from app.services.yolo_engine import YOLOEngine
 from app.services.tracker import ObjectTracker
 from app.services.anomaly import AnomalyEngine
 from app.services.patrol_optimizer import PatrolOptimizer
-from app.services.frame_grabber import FrameGrabber
 from app.database.db import init_db
 
 # Logging
@@ -36,11 +36,10 @@ class AppState:
     anomaly: AnomalyEngine = None
     patrol: PatrolOptimizer = None
     connected_cameras: dict = {}
-    grabber: FrameGrabber = None
     ws_clients: set = set()
     # ESP32 IPs — camera streams from one, servo control on another
-    camera_ip: str = "10.215.167.161"   # ESP32-CAM (MJPEG stream)
-    servo_ip: str = "10.215.167.39"     # ESP32 DevKit (servo/PTZ control)
+    camera_ip: str = "10.154.46.161"    # ESP32-CAM (MJPEG stream)
+    servo_ip: str = "10.154.46.39"     # ESP32 DevKit (servo/PTZ control)
 
 
 # ==========================================
@@ -75,14 +74,17 @@ async def lifespan(app: FastAPI):
     app.state.mqtt.connect()
     logger.info("✅ MQTT bridge connected")
 
+    # Initialize auto-tracker
+    app.state.auto_tracker = AutoTracker(app)
+    logger.info("✅ Auto-tracker ready")
+
     # Shared state
     app.state.connected_cameras = {}
     app.state.ws_clients = set()
 
-    # Initialize and start continuous frame grabber
-    app.state.grabber = FrameGrabber(app)
-    app.state.grabber.start()
-    logger.info("✅ Frame grabber started (auto-processing camera stream)")
+    # Set default ESP32 IPs so dashboard gets them on first load
+    app.state.camera_ip = AppState.camera_ip
+    app.state.servo_ip = AppState.servo_ip
 
     logger.info("🚀 Project Netra Backend Ready!")
     logger.info("📡 Dashboard: http://localhost:5173")
@@ -92,8 +94,6 @@ async def lifespan(app: FastAPI):
 
     # Shutdown
     logger.info("🛑 Shutting down...")
-    if app.state.grabber:
-        app.state.grabber.stop()
     if app.state.mqtt:
         app.state.mqtt.disconnect()
 
@@ -125,53 +125,6 @@ app.include_router(alerts.router, prefix="/api/alerts", tags=["Alerts"])
 
 
 # ==========================================
-# Frame Grabber Control Endpoints
-# ==========================================
-@app.get("/api/grabber/status")
-async def grabber_status():
-    """Get frame grabber status and performance stats."""
-    grabber = app.state.grabber
-    if not grabber:
-        return {"running": False, "message": "Frame grabber not initialized"}
-    return grabber.get_stats()
-
-
-@app.post("/api/grabber/start")
-async def grabber_start():
-    """Start the continuous frame grabber."""
-    grabber = app.state.grabber
-    if grabber:
-        grabber.start()
-        return {"status": "started"}
-    return {"status": "error", "message": "Frame grabber not initialized"}
-
-
-@app.post("/api/grabber/stop")
-async def grabber_stop():
-    """Stop the continuous frame grabber."""
-    grabber = app.state.grabber
-    if grabber:
-        grabber.stop()
-        return {"status": "stopped"}
-    return {"status": "error", "message": "Frame grabber not initialized"}
-
-
-@app.post("/api/grabber/config")
-async def grabber_config(target_fps: int = 10, confidence: float = 0.4):
-    """Update frame grabber configuration."""
-    grabber = app.state.grabber
-    if grabber:
-        grabber.target_fps = max(1, min(30, target_fps))
-        grabber.confidence = max(0.1, min(0.9, confidence))
-        return {
-            "status": "updated",
-            "target_fps": grabber.target_fps,
-            "confidence": grabber.confidence,
-        }
-    return {"status": "error", "message": "Frame grabber not initialized"}
-
-
-# ==========================================
 # Health Check
 # ==========================================
 @app.get("/")
@@ -192,12 +145,9 @@ async def root():
 
 @app.get("/health")
 async def health():
-    grabber = app.state.grabber
     return {
         "status": "healthy",
         "yolo_loaded": app.state.yolo is not None,
         "mqtt_connected": app.state.mqtt.is_connected() if app.state.mqtt else False,
         "active_cameras": len(app.state.connected_cameras),
-        "grabber_running": grabber.is_running if grabber else False,
-        "grabber_fps": grabber.fps if grabber else 0,
     }

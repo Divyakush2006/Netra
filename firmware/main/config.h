@@ -10,7 +10,7 @@
 #define WIFI_PASSWORD   "12345678"
 
 // --- MQTT Configuration ---
-#define MQTT_BROKER     "10.215.167.244"   // Backend server IP
+#define MQTT_BROKER     "10.154.46.244"    // Backend server IP
 #define MQTT_PORT       1883
 #define MQTT_USER       ""                 // Leave empty if no auth
 #define MQTT_PASSWORD   ""

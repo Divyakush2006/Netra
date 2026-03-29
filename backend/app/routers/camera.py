@@ -60,6 +60,39 @@ async def list_cameras(request: Request):
     return {"cameras": cameras, "count": len(cameras)}
 
 
+# ==========================================
+# Auto-Tracking (YOLO-powered)
+# ==========================================
+
+@router.post("/tracking/start")
+async def start_tracking(request: Request):
+    """Start YOLO auto-tracking — camera follows detected person."""
+    tracker = getattr(request.app.state, 'auto_tracker', None)
+    if not tracker:
+        raise HTTPException(500, "Auto-tracker not initialized")
+    tracker.start()
+    return {"status": "started", "message": "YOLO auto-tracking active"}
+
+
+@router.post("/tracking/stop")
+async def stop_tracking(request: Request):
+    """Stop YOLO auto-tracking."""
+    tracker = getattr(request.app.state, 'auto_tracker', None)
+    if not tracker:
+        raise HTTPException(500, "Auto-tracker not initialized")
+    tracker.stop()
+    return {"status": "stopped"}
+
+
+@router.get("/tracking/status")
+async def tracking_status(request: Request):
+    """Get auto-tracking status."""
+    tracker = getattr(request.app.state, 'auto_tracker', None)
+    if not tracker:
+        return {"running": False}
+    return tracker.get_status()
+
+
 @router.get("/{camera_id}/status")
 async def camera_status(camera_id: int, request: Request):
     """Get status of a specific camera."""
@@ -144,6 +177,7 @@ async def configure_camera(camera_id: int, config: CameraConfig, request: Reques
     if success:
         return {"status": "config_sent", "config": config.dict(exclude_none=True)}
     raise HTTPException(503, "Failed to send MQTT command")
+
 
 
 # ==========================================
