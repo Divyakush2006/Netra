@@ -18,6 +18,22 @@
   <img src="https://img.shields.io/badge/MQTT-Protocol-660066?style=for-the-badge&logo=eclipsemosquitto" />
 </p>
 
+<p align="center">
+  <img src="https://img.shields.io/badge/Python-3.10+-3776AB?logo=python&logoColor=white" />
+  <img src="https://img.shields.io/badge/React-18-61DAFB?logo=react&logoColor=white" />
+  <img src="https://img.shields.io/badge/License-Apache%202.0-green" />
+  <img src="https://img.shields.io/badge/Platform-Edge%20AI%20%2B%20IoT-orange" />
+</p>
+
+---
+
+> ### ⚡ Highlights
+> - 🎯 **Real-time autonomous tracking** — YOLOv8 detects a person and drives pan-tilt servos to keep them centered, closed-loop over MQTT
+> - 🧠 **Full edge-to-cloud stack** — ESP32-CAM firmware → FastAPI inference server → live React dashboard, one cohesive system
+> - 📈 **Behavioral Anomaly Signature Engine (BASE)** — multi-factor threat scoring + time-weighted patrol heat-maps
+> - 🕸️ **Scalable by design** — ESP-NOW mesh handoff across up to **8 camera nodes**
+> - 🛰️ **~15 FPS MJPEG streaming** at 640×480 with PSRAM dual-buffering and 4-second auto-reconnect
+
 ---
 
 ## 📑 Table of Contents
@@ -47,7 +63,7 @@
 
 ## 🌟 Overview
 
-**Project Netra** (*Netra = "Eye" in Sanskrit*) is a complete, end-to-end intelligent surveillance system built for a Microprocessors & Microcontrollers (MPMC) course project. It combines embedded systems (ESP32-CAM), computer vision (YOLOv8), and modern web technologies into a real-time security monitoring platform.
+**Project Netra** (*Netra = "Eye" in Sanskrit*) is a complete, end-to-end intelligent surveillance system that fuses **embedded systems (ESP32-CAM)**, **computer vision (YOLOv8)**, and **modern web technologies** into a real-time security monitoring platform. It spans the full stack — from on-device firmware and edge detection to a Python inference server and a live React control dashboard. *(Originally engineered as a Microprocessors & Microcontrollers course project, built out into a production-style system.)*
 
 The system streams live video from an ESP32-CAM, processes frames through YOLOv8 for person detection, and **automatically adjusts pan-tilt servos to track and follow a detected person** — all controllable from a sleek React dashboard.
 
@@ -287,7 +303,7 @@ MPMC Project/
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/Netra.git
+git clone https://github.com/Divyakush2006/Netra.git
 cd Netra
 ```
 
@@ -591,11 +607,16 @@ This project is licensed under the **Apache License 2.0** — see the [LICENSE](
 
 ## 👤 Author
 
-**Divyakush** — [@divyakush2006](https://github.com/divyakush2006)
+**Divyakush Punjabi** — B.Tech CSE @ VIT Vellore · AI Major @ IIT Ropar
+
+[![LinkedIn](https://img.shields.io/badge/LinkedIn-0A66C2?style=flat&logo=linkedin&logoColor=white)](https://linkedin.com/in/divyakush-punjabi)
+[![Portfolio](https://img.shields.io/badge/Portfolio-FF5722?style=flat&logo=googlechrome&logoColor=white)](https://divyakush2006.github.io/divyakush-resume/)
+[![GitHub](https://img.shields.io/badge/GitHub-181717?style=flat&logo=github&logoColor=white)](https://github.com/divyakush2006)
 
 ---
 
 <p align="center">
-  <b>Built with 💡 for MPMC Course Project</b><br>
-  <em>ESP32 • Python • React • YOLOv8 • MQTT</em>
+  <b>End-to-end Edge AI × IoT — firmware to dashboard.</b><br>
+  <em>ESP32 • YOLOv8 • FastAPI • React • MQTT</em><br>
+  <sub>⭐ Star the repo if you find it useful.</sub>
 </p>
